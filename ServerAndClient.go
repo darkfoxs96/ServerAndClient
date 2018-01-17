@@ -55,11 +55,12 @@ func readConn(conn net.Conn, readChan chan<- []byte) {
 			break
 		}
 		if KnowTheSize {
-			bu := new(bytes.Buffer)
-			_, err = bu.Write(previous)
-			if err != nil {
-				fmt.Println(err)
-			}
+			//var bu bytes.Buffer
+			bu := bytes.NewBuffer(previous)
+			//_, err = bu.Write(previous)
+			//if err != nil {
+			//	fmt.Println(err)
+			//}
 			_, err = bu.Write(read[:end])
 			if err != nil {
 				fmt.Println(err)
@@ -94,6 +95,22 @@ func sizeDetermination(read []byte) int {
 	numeral, _ = strconv.Atoi(size)
 	///-1 Not the size
 	return numeral
+}
+
+func countSize(header []byte) (size int) {
+	size = int(header[0]) + int(header[1])*256 + int(header[2]) * 256 * 256  + int(header[2]) * 256 * 256 * 256
+	return
+}
+
+func calcSize(size int) (header []byte) {
+	header = make([]byte, 4)
+	header[0] = byte(size % 256)
+	size /= 256
+	header[1] = byte(size % 256)
+	size /= 256
+	header[2] = byte(size % 256)
+	header[3] = byte(size / 256)
+	return
 }
 
 func residueAndEnd(read []byte, end int) bool {
