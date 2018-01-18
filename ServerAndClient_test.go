@@ -28,20 +28,14 @@ func TestServerAndClient(t *testing.T) {
 	go writeChanFunc(writeChan)
 	//readChan
 	in := bytes.NewBuffer(<-readChan)
-	_, err := in.Write([]byte("\n"))
-	if err != nil {
-		t.Errorf("Exeption read chan")
-	}
+	_, _ = in.Write([]byte("\n"))
 	for i := 0; i < 7; i++ {
 		message := <-readChan
-		_, err = in.Write(message[:])
+		_, err := in.Write(message[:])
 		if err != nil {
-			t.Errorf("Exeption read chan")
+			t.Errorf("Exeption write in Buffer")
 		}
-		_, err = in.Write([]byte("\n"))
-		if err != nil {
-			t.Errorf("Exeption read chan")
-		}
+		_, _ = in.Write([]byte("\n"))
 	}
 	result := in.String()
 	if result != testResult {
