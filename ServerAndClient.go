@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"strconv"
+	"time"
 )
 
 func main() {
@@ -26,7 +26,6 @@ func StartServerIfClient(port string, serverHost string, readChan chan []byte, w
 	} else {
 		RPCServer(port, readChan)
 	}
-
 }
 
 func RPCServer(port string, readChan chan<- []byte) {
@@ -55,50 +54,26 @@ func readConn(conn net.Conn, readChan chan<- []byte) {
 			break
 		}
 		if KnowTheSize {
-			//var bu bytes.Buffer
-			bu := bytes.NewBuffer(previous)
-			//_, err = bu.Write(previous)
-			//if err != nil {
-			//	fmt.Println(err)
-			//}
-			_, err = bu.Write(read[:end])
+			message := bytes.NewBuffer(previous)
+			_, err = message.Write(read[:end])
 			if err != nil {
 				fmt.Println(err)
 			}
-			glued := bu.Bytes()
-			readChan <- glued
+			readChan <- message.Bytes()
 			KnowTheSize = false
-			if residueAndEnd(read, end) {
-				KnowTheSize, previous, end = realizationResidue(readChan, read, end)
+			previous = nil
+			if residueIfEnd(read, end) {
+				previous = realizationResidue(read, end)
 			}
 		} else {
-			end = sizeDetermination(read)
-			if end != -1 {
-				KnowTheSize = true
-			}
+			end = countSize(read)
+			KnowTheSize = true
 		}
 	}
-}
-
-func sizeDetermination(read []byte) int {
-	size := ""
-	for i := 0; i <= 3; i++ {
-		Val := string(read[i])
-		numeral, err := strconv.Atoi(Val)
-		if err != nil {
-			return -1
-		}
-		s := strconv.Itoa(numeral)
-		size += s
-	}
-	numeral := -1
-	numeral, _ = strconv.Atoi(size)
-	///-1 Not the size
-	return numeral
 }
 
 func countSize(header []byte) (size int) {
-	size = int(header[0]) + int(header[1])*256 + int(header[2]) * 256 * 256  + int(header[2]) * 256 * 256 * 256
+	size = int(header[0]) + int(header[1])*256 + int(header[2])*256*256 + int(header[3])*256*256*256
 	return
 }
 
@@ -113,7 +88,7 @@ func calcSize(size int) (header []byte) {
 	return
 }
 
-func residueAndEnd(read []byte, end int) bool {
+func residueIfEnd(read []byte, end int) bool {
 	var by byte
 	col := bytes.IndexByte(read, by)
 	if col != end {
@@ -122,29 +97,12 @@ func residueAndEnd(read []byte, end int) bool {
 	return false
 }
 
-func realizationResidue(readChan chan<- []byte, read []byte, endIn int) (bool, []byte, int) {
-	by := read[endIn:]
-	var end int
-	var previous []byte
-	for {
-		end = sizeDetermination(by)
-		if end == -1 {
-			var b byte
-			col := bytes.IndexByte(by, b)
-			previous = by[:col]
-			return false, previous, 0
-		} else {
-			if !residueAndEnd(by, 4) {
-				return true, previous, end
-			}
-			readChan <- by[4 : 4+end]
-			if residueAndEnd(by, end) {
-				by = by[4+end:]
-			} else {
-				return false, previous, 0
-			}
-		}
-	}
+func realizationResidue(read []byte, endIn int) (previous []byte) {
+	buf := read[endIn:]
+	var empty byte
+	end := bytes.IndexByte(buf, empty)
+	previous = buf[:end]
+	return
 }
 
 func RPCClient(serverHost string, writeChan <-chan []byte) {
@@ -161,10 +119,18 @@ func RPCClient(serverHost string, writeChan <-chan []byte) {
 
 func connWrite(conn net.Conn, writeChan <-chan []byte) {
 	for {
-		n, err := conn.Write(<-writeChan)
+		message := <-writeChan
+		_, err := conn.Write(calcSize(len(message)))
 		if err != nil {
-			fmt.Println(n, err)
+			fmt.Println(err)
 			break
 		}
+		time.Sleep(1 * time.Millisecond)
+		_, err = conn.Write(message)
+		if err != nil {
+			fmt.Println(err)
+			break
+		}
+		time.Sleep(1 * time.Millisecond)
 	}
 }
