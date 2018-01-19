@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"time"
 )
 
 func main() {
@@ -43,32 +42,86 @@ func RPCServer(port string, readChan chan<- []byte) {
 }
 
 func readConn(conn net.Conn, readChan chan<- []byte) {
-	KnowTheSize := false
-	var end int
-	var previous []byte
-	for {
-		read := make([]byte, 1000)
-		_, err := conn.Read(read)
+	fullArray := make([]byte, 1000)
+	var writePointer int
+	var sizeMessage int
+	var newLen int
+	var remainArray []byte
+	for{
+		readArray := fullArray[writePointer:]
+		n, err := conn.Read(readArray)
 		if err != nil {
 			fmt.Println(err)
 			break
 		}
-		if KnowTheSize {
-			message := bytes.NewBuffer(previous)
-			_, err = message.Write(read[:end])
-			if err != nil {
-				fmt.Println(err)
+		fullArray = fullArray[:writePointer + n]
+		writePointer = 0
+		for{
+			if len(fullArray) == 4 && sizeMessage == 0{
+				sizeMessage = countSize(fullArray)
+				newLen = sizeMessage
+				break
+			}else{
+				if len(fullArray) == sizeMessage{
+					readChan <- fullArray[:]
+					sizeMessage = 0
+					break
+				}
 			}
-			readChan <- message.Bytes()
-			KnowTheSize = false
-			previous = nil
-			if residueIfEnd(read, end) {
-				previous = realizationResidue(read, end)
+			if len(fullArray) > 4 && sizeMessage == 0{
+				sizeMessage = countSize(fullArray)
+				if len(fullArray) - 4 == sizeMessage{
+					readChan <- fullArray[4:sizeMessage + 4]
+					sizeMessage = 0
+					break
+				}
+				if len(fullArray) - 4 < sizeMessage{
+					newLen = sizeMessage
+					remainArray = fullArray[4:]
+					writePointer = len(remainArray)
+					break
+				}
+				if len(fullArray) - 4 > sizeMessage{
+					readChan <- fullArray[4 : sizeMessage + 4]
+					fullArray = fullArray[4 + sizeMessage:]
+					sizeMessage = 0
+				}
 			}
-		} else {
-			end = countSize(read)
-			KnowTheSize = true
+			if len(fullArray) < sizeMessage && sizeMessage != 0{
+				remainArray = fullArray[:]
+				writePointer = len(remainArray)
+				newLen = sizeMessage
+				break
+			}
+			if len(fullArray) > sizeMessage && sizeMessage != 0{
+				readChan <- fullArray[:sizeMessage]
+				fullArray = fullArray[sizeMessage:]
+				if len(fullArray) == 4 {
+					sizeMessage = countSize(fullArray)
+					break
+				}
+				if len(fullArray) < 4{
+					remainArray = fullArray[:]
+					newLen = len(remainArray)
+					writePointer = len(remainArray)
+					break
+				}
+				if len(fullArray) > 4{
+					sizeMessage = countSize(fullArray)
+					fullArray = fullArray[4:]
+				}
+			}
+			if len(fullArray) < 4 && sizeMessage == 0{
+				remainArray = fullArray[:]
+				newLen = len(remainArray)
+				writePointer = len(remainArray)
+				break
+			}
 		}
+		fullArray = make([]byte, newLen + 1000)
+		newLen = 0
+		copy(fullArray, remainArray)
+		remainArray = nil
 	}
 }
 
@@ -125,12 +178,10 @@ func connWrite(conn net.Conn, writeChan <-chan []byte) {
 			fmt.Println(err)
 			break
 		}
-		time.Sleep(1 * time.Millisecond)
 		_, err = conn.Write(message)
 		if err != nil {
 			fmt.Println(err)
 			break
 		}
-		time.Sleep(1 * time.Millisecond)
 	}
 }
