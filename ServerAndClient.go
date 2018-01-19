@@ -47,78 +47,78 @@ func readConn(conn net.Conn, readChan chan<- []byte) {
 	var sizeMessage int
 	var newLen int
 	var remainArray []byte
-	for{
+	for {
 		readArray := fullArray[writePointer:]
 		n, err := conn.Read(readArray)
 		if err != nil {
 			fmt.Println(err)
 			break
 		}
-		fullArray = fullArray[:writePointer + n]
+		fullArray = fullArray[:writePointer+n]
 		writePointer = 0
-		for{
-			if len(fullArray) == 4 && sizeMessage == 0{
+		for {
+			if len(fullArray) == 4 && sizeMessage == 0 {
 				sizeMessage = countSize(fullArray)
 				newLen = sizeMessage
 				break
-			}else{
-				if len(fullArray) == sizeMessage{
+			} else {
+				if len(fullArray) == sizeMessage {
 					readChan <- fullArray[:]
 					sizeMessage = 0
 					break
 				}
 			}
-			if len(fullArray) > 4 && sizeMessage == 0{
+			if len(fullArray) > 4 && sizeMessage == 0 {
 				sizeMessage = countSize(fullArray)
-				if len(fullArray) - 4 == sizeMessage{
-					readChan <- fullArray[4:sizeMessage + 4]
+				if len(fullArray)-4 == sizeMessage {
+					readChan <- fullArray[4 : sizeMessage+4]
 					sizeMessage = 0
 					break
 				}
-				if len(fullArray) - 4 < sizeMessage{
+				if len(fullArray)-4 < sizeMessage {
 					newLen = sizeMessage
 					remainArray = fullArray[4:]
 					writePointer = len(remainArray)
 					break
 				}
-				if len(fullArray) - 4 > sizeMessage{
-					readChan <- fullArray[4 : sizeMessage + 4]
-					fullArray = fullArray[4 + sizeMessage:]
+				if len(fullArray)-4 > sizeMessage {
+					readChan <- fullArray[4 : sizeMessage+4]
+					fullArray = fullArray[4+sizeMessage:]
 					sizeMessage = 0
 				}
 			}
-			if len(fullArray) < sizeMessage && sizeMessage != 0{
+			if len(fullArray) < sizeMessage && sizeMessage != 0 {
 				remainArray = fullArray[:]
 				writePointer = len(remainArray)
 				newLen = sizeMessage
 				break
 			}
-			if len(fullArray) > sizeMessage && sizeMessage != 0{
+			if len(fullArray) > sizeMessage && sizeMessage != 0 {
 				readChan <- fullArray[:sizeMessage]
 				fullArray = fullArray[sizeMessage:]
 				if len(fullArray) == 4 {
 					sizeMessage = countSize(fullArray)
 					break
 				}
-				if len(fullArray) < 4{
+				if len(fullArray) < 4 {
 					remainArray = fullArray[:]
 					newLen = len(remainArray)
 					writePointer = len(remainArray)
 					break
 				}
-				if len(fullArray) > 4{
+				if len(fullArray) > 4 {
 					sizeMessage = countSize(fullArray)
 					fullArray = fullArray[4:]
 				}
 			}
-			if len(fullArray) < 4 && sizeMessage == 0{
+			if len(fullArray) < 4 && sizeMessage == 0 {
 				remainArray = fullArray[:]
 				newLen = len(remainArray)
 				writePointer = len(remainArray)
 				break
 			}
 		}
-		fullArray = make([]byte, newLen + 1000)
+		fullArray = make([]byte, newLen+1000)
 		newLen = 0
 		copy(fullArray, remainArray)
 		remainArray = nil
